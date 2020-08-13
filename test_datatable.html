@@ -1,0 +1,133 @@
+<!DOCTYPE>
+<html>
+  <head>
+    
+    <title>Trying Data Table</title>
+  
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery-sparklines/2.1.2/jquery.sparkline.js"></script>
+
+    <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.10.19/css/jquery.dataTables.css">
+  
+    <script type="text/javascript" charset="utf8" src="https://cdn.datatables.net/1.10.19/js/jquery.dataTables.js"></script>
+
+    <script type="text/javascript">
+        $(function() {
+            /** This code runs when everything has been loaded on the page */
+            /* Inline sparklines take their values from the contents of the tag */
+            $('.inlinesparkline').sparkline('html', {
+                type: 'line',
+                width: '70',
+                height: '35'
+            });
+    
+            /* Sparklines can also take their values from the first argument 
+            passed to the sparkline() function */
+            var myvalues = [10,8,5,7,4,4,1];
+            $('.dynamicsparkline').sparkline(myvalues);
+    
+            /* The second argument gives options such as chart type */
+            $('.dynamicbar').sparkline(myvalues, {type: 'bar', barColor: 'green'} );
+    
+            /* Use 'html' instead of an array of values to pass options 
+            to a sparkline with data in the tag */
+            $('.inlinebar').sparkline('html', {type: 'bar', barColor: 'red'} );
+        });
+        </script>
+    
+    <script> 
+        $(document).ready( function () {
+            $('#example').DataTable( {
+
+                
+
+                "columns": [
+                    null,
+                    { "width": "2px"},
+                    null,
+                    null,
+                    null,
+                    null
+                ]
+
+            } );
+
+                
+        } );
+    </script>
+
+
+  </head>
+  <body>
+        <p>
+                Inline Sparkline: <span class="dynamicsparkline">1</span>.
+        </p>
+
+      <table id="example" class="display" style="width:100%">
+          <thead>
+              <tr>
+                  <th>Name</th>
+                  <th>Position</th>
+                  <th>Office</th>
+                  <th>Age</th>
+                  <th>Start date</th>
+                  <th>Salary</th>
+              </tr>
+          </thead>
+          <tbody>
+              <tr>
+                  <td>Tiger Nixon</td>
+                  <td>System Architect</td>
+                  <td>Edinburgh</td>
+                  <td>61</td>
+                  <td>2011/04/25</td>
+                  <td>$320,800</td>
+              </tr>
+              <tr>
+                  <td>
+
+                    <span style = "display: inline-block; direction: rtl; width: 70%; border-radius: 1px; padding-left: 1px; background-color: blue">
+                      Garrett Winters
+                    </span>
+
+                </td>
+                  <td><span class="inlinesparkline">1,4,4,7,5,9,2314, 2134,234,213,4,2134,231,42,314,231,4,231,4324,5,34,45,345,4,6,99,7,47,346,325,124,231,4,34,323,3465,565,7,865,74623,5124,1310</span></td>
+                  <td>Tokyo</td>
+                  <td>63</td>
+                  <td>2011/07/25</td>
+                  <td>$170,750</td>
+              </tr>
+              <tr>
+                  <td><span style = "display: inline-block; direction: rtl; width: 50%; border-radius: 1px; padding-left: 1px; background-color: blue">
+                    Ashton Cox </span></td>
+                  <td>Junior Technical Author</td>
+                  <td>San Francisco</td>
+                  <td>66</td>
+                  <td>2009/01/12</td>
+                  <td>$86,000</td>
+              </tr>
+              <tr>
+                  <td><span style = "display: inline-block; direction: rtl; width: 10%; border-radius: 1px; padding-left: 1px; background-color: blue"> .</span>Cedric Kelly</td>
+                  <td>Senior Javascript Developer</td>
+                  <td>Edinburgh</td>
+                  <td>22</td>
+                  <td>2012/03/29</td>
+                  <td>$433,060</td>
+              </tr>
+              <tr>
+                  <td>Airi Satou</td>
+                  <td>Accountant</td>
+                  <td>Tokyo</td>
+                  <td>33</td>
+                  <td>2008/11/28</td>
+                  <td>$162,700</td>
+              </tr>
+          </tbody>
+      </table>
+  </body>
+</html>
+
+
+
+
