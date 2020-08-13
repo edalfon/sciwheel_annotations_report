@@ -84,7 +84,6 @@ chrome.pageAction.onClicked.addListener(function(activeTab) {
     //message('Settings saved');
   });
 
-  // get ref id
   // get token
   
   var newURL = "annotations_report.html" + "?sciwheelRefId=" + sciwheelRefId;
