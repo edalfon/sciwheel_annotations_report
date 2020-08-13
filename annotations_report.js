@@ -23,9 +23,12 @@ document.addEventListener('DOMContentLoaded', function () {
 // which leads to a much cleaner code (avoids callback hell)
 async function buildAnnotationReports(sciwheelRefId, sciwheelAuthToken) {
 
+  var baseUrl = "https://sciwheel.com/extapi/work";
+
   // We need to fetch requests, one for the details of the reference
   // and one for the notes
-  let commentsResponse = await fetch("https://sciwheel.com/extapi/work/references/" + sciwheelRefId + "/notes", {
+  var notesUrl = baseUrl + "/references/" + sciwheelRefId + "/notes";
+  let commentsResponse = await fetch(notesUrl, {
     method: 'get',
     headers: {
       "Authorization": "Bearer " + sciwheelAuthToken,
@@ -37,7 +40,8 @@ async function buildAnnotationReports(sciwheelRefId, sciwheelAuthToken) {
   });
   let commentsJsonData = await commentsResponse.json();
 
-  let refResponse = await fetch("https://sciwheel.com/extapi/work/references/" + sciwheelRefId, {
+  var refsUrl = baseUrl + "/references/" + sciwheelRefId;
+  let refResponse = await fetch(refsUrl, {
     method: 'get',
     headers: {
       "Authorization": "Bearer " + sciwheelAuthToken,
@@ -57,21 +61,22 @@ async function buildAnnotationReports(sciwheelRefId, sciwheelAuthToken) {
 function buildVisReport(refData, commentsData) {
 
   // refData is an object with reference metadata, incuding 27 fields
-  // relevant fields are: title, abstractText, publishedYear, authorsText, fullTextLink, pdfUrl
+  // relevant fields are: 
+  // title, abstractText, publishedYear, authorsText, fullTextLink, pdfUrl
 
-  // commentsData is an array of comments
-  // each comment has an id, user, comment, highlightText, replies, created, updated, url
+  // commentsData is an array of comments where each comment has:
+  // id, user, comment, highlightText, replies, created, updated, url
   // for now, we are interested in: 
-  //     comment (to put it as node text, when available, otherwise put highlightText) and 
+  //     comment (to put it as node text, if available, otherwise highlightText)
   //     highlightText (to put it as tooltip)
-  // TODO: perhaps later include replies using a recursive fn
+  // TODO: perhaps later include replies 
   // TODO: sort the report based on created or updated
 
   // https://stackoverflow.com/questions/1078118/how-do-i-iterate-over-a-json-structure
   // https://stackoverflow.com/questions/9329446/for-each-over-an-array-in-javascript
 
 
-  document.getElementById("tab_b").innerHTML = JSON.stringify(commentsData); // pure JS
+  document.getElementById("tab_b").innerHTML = JSON.stringify(commentsData); 
 
   var visData = getMindMapSkeleton();
 
@@ -83,8 +88,8 @@ function buildVisReport(refData, commentsData) {
   labelText = refData['authorsText'].substring(0, 20) + ' (' + 
               refData['publishedYear'] + ')\n\n' + 
               wordWrap(refData['title'], 35, '\n');
-  // We do want to full tooltip, but we want it word-wrapped it
-  //titleText = refData['abstractText'].replace(/(?![^\n]{1,50}$)([^\n]{1,50})\s/g, '$1<br/>');
+  // We do want to full tooltip, but we want it word-wrapped, otherwise it 
+  // could be a very long line that overflows horizontally
   titleText = wordWrap(refData['abstractText'], 50, '<br/>');
  
   visData.nodes.update([{id: '#t', label: labelText, title: titleText, level: 1}]);
@@ -371,10 +376,12 @@ function getMindMapSkeleton() {
 }
 
 function wordWrap(rawText, wrapWidth = 50, wrapSeparator = '\n', trunc = -1) {
-  var wrappedText = rawText || ''; // idiom to validate and or prevent errors
-  wrappedText = (trunc != -1) ? wrappedText.substring(0, trunc) + '...' : wrappedText; //truncate if needed
-  var wrapRegexp = new RegExp('(?![^\\n]{1,' + wrapWidth + '}$)([^\\n]{1,' + wrapWidth + '})\\s', 'g');
-  wrappedText = wrappedText.replace(wrapRegexp, '$1' + wrapSeparator);
-  return wrappedText;
+  var wrapped = rawText || ''; // idiom to prevent errors if it is null
+  wrapped = trunc != -1 ? wrapped.substring(0, trunc) + '...' : wrapped; 
+  var wrapRegexp = new RegExp(
+    '(?![^\\n]{1,' + wrapWidth + '}$)([^\\n]{1,' + wrapWidth + '})\\s', 'g'
+  );
+  wrapped = wrapped.replace(wrapRegexp, '$1' + wrapSeparator);
+  return wrapped;
 }
 
