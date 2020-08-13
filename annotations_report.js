@@ -3,7 +3,8 @@
 // specific elements when it triggers.
 document.addEventListener('DOMContentLoaded', function () {
 
-  // Before starting getting data from sciwheel we need to know which reference to query and the authorization token
+  // Before starting getting data from sciwheel we need to know which reference 
+  // to query and the authorization token
   // TODO: check how to do it better considering:
   //       - async behaviour (can happen that we try to get the value, 
   //         and it is not already set and/or that we get the value and 
@@ -51,26 +52,6 @@ async function buildAnnotationReports(sciwheelRefId, sciwheelAuthToken) {
   buildVisReport(refJsonData, commentsJsonData);
   // We can add here other output formats
 }
-
-// OLD version using callbacks, which can lead to callback hell 
-function buildAnnotationReports_old() {
-
-  // Initialization work goes here
-  fetch("https://sciwheel.com/extapi/work/references/" + sciwheelRefId + "/notes", {
-    method: 'get',
-    headers: {
-      "Authorization": "Bearer " + sciwheelAuthToken,
-      "Content-type": "application/json;charset=UTF-8"
-    }
-  })
-  .then(res => res.json())
-  .then(function (data) {
-    buildReport(data);
-  })
-  .catch(function (error) {
-    console.log('Request failed', error);
-  });
-};
 
 
 function buildVisReport(refData, commentsData) {
