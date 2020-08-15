@@ -2,7 +2,6 @@
 // `DOMContentLoaded` event on the document, and adding your listeners to
 // specific elements when it triggers.
 document.addEventListener('DOMContentLoaded', function () {
-
   // Before starting getting data from sciwheel we need to know which reference 
   // to query and the authorization token
   // TODO: check how to do it better considering:
@@ -26,7 +25,7 @@ async function buildAnnotationReports(sciwheelRefId, sciwheelAuthToken) {
   var baseUrl = "https://sciwheel.com/extapi/work";
 
   // We need to fetch requests, one for the details of the reference
-  // and one for the notes
+  // Notes
   var notesUrl = baseUrl + "/references/" + sciwheelRefId + "/notes";
   let commentsResponse = await fetch(notesUrl, {
     method: 'get',
@@ -40,6 +39,7 @@ async function buildAnnotationReports(sciwheelRefId, sciwheelAuthToken) {
   });
   let commentsJsonData = await commentsResponse.json();
 
+  // Refs
   var refsUrl = baseUrl + "/references/" + sciwheelRefId;
   let refResponse = await fetch(refsUrl, {
     method: 'get',
@@ -53,6 +53,7 @@ async function buildAnnotationReports(sciwheelRefId, sciwheelAuthToken) {
   });
   let refJsonData = await refResponse.json();
 
+  // Build reports
   buildVisReport(refJsonData, commentsJsonData);
   // We can add here other output formats
 }
@@ -66,9 +67,10 @@ function buildVisReport(refData, commentsData) {
 
   // commentsData is an array of comments where each comment has:
   // id, user, comment, highlightText, replies, created, updated, url
-  // for now, we are interested in: 
-  //     comment (to put it as node text, if available, otherwise highlightText)
+  // Ffor now, we are interested in: 
+  //     comment (put it as node text, if available, otherwise use highlightText)
   //     highlightText (to put it as tooltip)
+
   // TODO: perhaps later include replies 
   // TODO: sort the report based on created or updated
 
@@ -88,7 +90,7 @@ function buildVisReport(refData, commentsData) {
   labelText = refData['authorsText'].substring(0, 20) + ' (' + 
               refData['publishedYear'] + ')\n\n' + 
               wordWrap(refData['title'], 35, '\n');
-  // We do want to full tooltip, but we want it word-wrapped, otherwise it 
+  // We do want a full-text tooltip, but we want it word-wrapped, otherwise it 
   // could be a very long line that overflows horizontally
   titleText = wordWrap(refData['abstractText'], 50, '<br/>');
  
@@ -98,8 +100,8 @@ function buildVisReport(refData, commentsData) {
 
     document.getElementById("tab_c").innerHTML += '<br/><br/>* Main annotation. Comment: [' + val['comment'] + '] ' + 'Highlight: [' + val['highlightText'] + ']';
 
-    // If there is no comment (either empty string, null or undefined) put it in highlights
-    // using the highlightText as node text
+    // If there is no comment (either empty string, null or undefined) put it 
+    // in highlights using the highlightText as node text
     if( (val['comment'] === null && typeof val['comment'] === "object") ||
         (val['comment'] === "" && typeof val['comment'] === "string") ||
         (val['comment'] === undefined && typeof val['comment'] === "undefined") ) {
@@ -117,9 +119,13 @@ function buildVisReport(refData, commentsData) {
     } else {
 
       // We separate the comments using hashtags (#)
-      valTokens = val['comment'].split('#').map(function(itm){return itm.trim();}).filter(item => item); //filter using ES6 arrow function to remove empty tokens
-      // And we determine the level of the comment, given the number of #, so count them
-      valLevels = val['comment'].match(/(#)\1*/g)||[];
+      valTokens = val['comment'].
+                  split('#').
+                  map(function(itm){return itm.trim();}).
+                  filter(item => item); //filter with arrow function to remove empty tokens
+      
+      // we determine the level of the comment, by the number of #s, count them
+      valLevels = val['comment'].match(/(#)\1*/g) || [];
       valLevels = valLevels.map(function(itm){return itm.length;});
 
       document.getElementById("tab_c").innerHTML += '<br/><br/>Tokenizing ... [levels: ' + valLevels + ']';
