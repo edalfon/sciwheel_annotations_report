@@ -16,9 +16,10 @@
 
 function getSciwheelRefId(tabUrl) {
   refIdDetailView = tabUrl.match('(sciwheel.com/work/#/items/)(\\d+)');
+  refIdUnsortedView = tabUrl.match('(sciwheel.com/work/#/items/unsorted/)(\\d+)');
   refIdPdfView = tabUrl.match('(sciwheel.com/work/item/)(\\d+)');
   // Matches either of those formats, or returns null
-  refId = refIdDetailView ?? refIdPdfView; // Nullish coalescing operator
+  refId = refIdDetailView ?? refIdPdfView ?? refIdUnsortedView; // Nullish coalescing operator
   refId = refId ? refId[2] : refId; // id are the numbers in the second group
   console.log(tabUrl)
   console.log(refId)
