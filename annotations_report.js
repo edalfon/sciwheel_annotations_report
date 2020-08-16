@@ -18,28 +18,20 @@ document.addEventListener('DOMContentLoaded', function () {
   });
 });
 
-// new version using async/await for the fetch calls, 
-// which leads to a much cleaner code (avoids callback hell)
 async function buildAnnotationReports(sciwheelRefId, sciwheelAuthToken) {
+
+  refJsonData = await getRefData(sciwheelRefId, sciwheelAuthToken);
+  notesJsonData = await getNotesData(sciwheelRefId, sciwheelAuthToken);
+  // Build reports
+  includeVisReport(refJsonData, notesJsonData);
+  // We can add here other output formats
+}
+
+// using async/await for the fetch calls, cleaner code (avoids callbac-hell)
+async function getRefData(sciwheelRefId, sciwheelAuthToken) {
 
   var baseUrl = "https://sciwheel.com/extapi/work";
 
-  // We need to fetch requests, one for the details of the reference
-  // Notes
-  var notesUrl = baseUrl + "/references/" + sciwheelRefId + "/notes";
-  let commentsResponse = await fetch(notesUrl, {
-    method: 'get',
-    headers: {
-      "Authorization": "Bearer " + sciwheelAuthToken,
-      "Content-type": "application/json;charset=UTF-8"
-    }
-  }).catch(function (error) {
-    // TODO: real error handling
-    document.getElementById("tab_d").innerHTML = "ERROR !!!"; // pure JS
-  });
-  let commentsJsonData = await commentsResponse.json();
-
-  // Refs
   var refsUrl = baseUrl + "/references/" + sciwheelRefId;
   let refResponse = await fetch(refsUrl, {
     method: 'get',
@@ -51,21 +43,38 @@ async function buildAnnotationReports(sciwheelRefId, sciwheelAuthToken) {
     // TODO: real error handling
     document.getElementById("tab_d").innerHTML = "ERROR !!!"; // pure JS
   });
-  let refJsonData = await refResponse.json();
 
-  // Build reports
-  buildVisReport(refJsonData, commentsJsonData);
-  // We can add here other output formats
+  return refResponse.json();
 }
 
 
-function buildVisReport(refData, commentsData) {
+// using async/await for the fetch calls, cleaner code (avoids callbac-hell)
+async function getNotesData(sciwheelRefId, sciwheelAuthToken) {
+
+  var baseUrl = "https://sciwheel.com/extapi/work";
+
+  var notesUrl = baseUrl + "/references/" + sciwheelRefId + "/notes";
+  let notesResponse = await fetch(notesUrl, {
+    method: 'get',
+    headers: {
+      "Authorization": "Bearer " + sciwheelAuthToken,
+      "Content-type": "application/json;charset=UTF-8"
+    }
+  }).catch(function (error) {
+    // TODO: real error handling
+    document.getElementById("tab_d").innerHTML = "ERROR !!!"; // pure JS
+  });
+
+  return notesResponse.json();
+}
+
+function includeVisReport(refData, notesData) {
 
   // refData is an object with reference metadata, incuding 27 fields
   // relevant fields are: 
   // title, abstractText, publishedYear, authorsText, fullTextLink, pdfUrl
 
-  // commentsData is an array of comments where each comment has:
+  // notesData is an array of comments where each comment has:
   // id, user, comment, highlightText, replies, created, updated, url
   // Ffor now, we are interested in: 
   //     comment (put it as node text, if available, otherwise use highlightText)
@@ -73,169 +82,208 @@ function buildVisReport(refData, commentsData) {
 
   // TODO: perhaps later include replies 
   // TODO: sort the report based on created or updated
-
   // https://stackoverflow.com/questions/1078118/how-do-i-iterate-over-a-json-structure
   // https://stackoverflow.com/questions/9329446/for-each-over-an-array-in-javascript
 
+  visData = buildVisData(refData, notesData);
+  visOptions = getVisOptions();
+  var container = document.getElementById('tab_a');
+  var network = new vis.Network(container, visData, visOptions);
+}
 
-  document.getElementById("tab_b").innerHTML = JSON.stringify(commentsData); 
+// This is a monster fn that could be better implemented / modularized
+function buildVisData(refData, notesData) {
+  document.getElementById("tab_b").innerHTML = JSON.stringify(notesData); // just for debugging and trying other tabs
 
+  // We start with the mind map skeleton and we will add comments as nodes
+  // skeleton already have nodes for title, objectives, methods, etc. 
+  // with short ids such as #t, #o, #m
   var visData = getMindMapSkeleton();
 
-  // We do not want too long labels, so truncate them and word-wrap them
+  // We want to start by adding the reference data to the title (main) node
   refData['authorsText'] = refData['authorsText'] || '';
   refData['publishedYear'] = refData['publishedYear'] || '';
   refData['title'] = refData['title'] || '';
   refData['abstractText'] = refData['abstractText'] || '';
-  labelText = refData['authorsText'].substring(0, 20) + ' (' + 
+  nodeTxt = refData['authorsText'].substring(0, 20) + ' (' + 
               refData['publishedYear'] + ')\n\n' + 
               wordWrap(refData['title'], 35, '\n');
   // We do want a full-text tooltip, but we want it word-wrapped, otherwise it 
   // could be a very long line that overflows horizontally
-  titleText = wordWrap(refData['abstractText'], 50, '<br/>');
+  tooltip = wordWrap(refData['abstractText'], 50, '<br/>');
  
-  visData.nodes.update([{id: '#t', label: labelText, title: titleText, level: 1}]);
+  visData.nodes.update([{
+    id: '#t', label: nodeTxt, title: tooltip, level: 1
+  }]);
 
-  for (var val of commentsData) {
+  for (var val of notesData) {
 
     document.getElementById("tab_c").innerHTML += '<br/><br/>* Main annotation. Comment: [' + val['comment'] + '] ' + 'Highlight: [' + val['highlightText'] + ']';
 
     // If there is no comment (either empty string, null or undefined) put it 
     // in highlights using the highlightText as node text
-    if( (val['comment'] === null && typeof val['comment'] === "object") ||
-        (val['comment'] === "" && typeof val['comment'] === "string") ||
-        (val['comment'] === undefined && typeof val['comment'] === "undefined") ) {
+    if((val['comment'] === null && typeof val['comment'] === "object") ||
+       (val['comment'] === undefined && typeof val['comment'] === "undefined")||
+       (val['comment'] === "" && typeof val['comment'] === "string")) {
 
       newId = Math.random();
-      // We do not want too long labels, so truncate them and word-wrap them as necessary
-      labelText = wordWrap(val['highlightText'], 30, '\n', 80);
-      titleText = wordWrap(val['highlightText'], 50, '<br/>');
+      // We do not want too long labels, so truncate and word-wrap as necessary
+      nodeTxt = wordWrap(val['highlightText'], 30, '\n', 80);
+      tooltip = wordWrap(val['highlightText'], 50, '<br/>');
       // Finally add the node and edge
-      visData.nodes.add([{id: newId, label: labelText, title: titleText, level: 3}]);
+      visData.nodes.add([{
+        id: newId, label: nodeTxt, title: tooltip, level: 3
+      }]);
       visData.edges.add([{from: '#h', to: newId}]);
 
-      document.getElementById("tab_c").innerHTML += '<br/><br/><span style="padding-left: 40px; display:block>** No comment => add to #h [id:' + newId + ' | label:' + labelText + ' | level:3' + ' | parent:#h' + ']</span>';
-      
+      document.getElementById("tab_c").innerHTML += '<br/><br/><span style="padding-left: 40px; display:block>** No comment => add to #h [id:' + newId + ' | label:' + nodeTxt + ' | level:3' + ' | parent:#h' + ']</span>';
     } else {
 
-      // We separate the comments using hashtags (#)
-      valTokens = val['comment'].
-                  split('#').
-                  map(function(itm){return itm.trim();}).
-                  filter(item => item); //filter with arrow function to remove empty tokens
-      
-      // we determine the level of the comment, by the number of #s, count them
-      valLevels = val['comment'].match(/(#)\1*/g) || [];
-      valLevels = valLevels.map(function(itm){return itm.length;});
-
-      document.getElementById("tab_c").innerHTML += '<br/><br/>Tokenizing ... [levels: ' + valLevels + ']';
-
-      if(valLevels.length === 0) { // this means there are no # delimiters, only an unstructured comment
-
+      if(!val['comment'].includes("#")) { // this means there are no delimiters,
+        // only unstructured comment => add it as highlight
         newId = Math.random();
-        // We do not want too long labels, so truncate them and word-wrap them as necessary
-        labelText = wordWrap(val['comment'], 30, '\n');
-        titleText = wordWrap(val['highlightText'], 50, '<br/>');
+        nodeTxt = wordWrap(val['comment'], 30, '\n');
+        tooltip = wordWrap(val['highlightText'], 50, '<br/>');
         // Finally add the node and edge
-        visData.nodes.add([{id: newId, label: labelText, title: titleText, level: 3}]);
+        visData.nodes.add([{
+          id: newId, label: nodeTxt, title: tooltip, level: 3
+        }]);
         visData.edges.add([{from: '#h', to: newId}]);
 
-        document.getElementById("tab_c").innerHTML += '<br/><br/><span style="padding-left: 40px; display:block>** No delimiter, just comment => add to #h [id:' + newId + ' | label:' + labelText + ' | level:3' + ' | parent:#h' + ']</span>';
-
+        document.getElementById("tab_c").innerHTML += '<br/><br/><span style="padding-left: 40px; display:block>** No delimiter, just comment => add to #h [id:' + newId + ' | label:' + nodeTxt + ' | level:3' + ' | parent:#h' + ']</span>';
       } else {
 
-        //check length are the same
+        // Then let's tokenize the comment that has structure
+        // We separate the comments using hashtags (#)
+        // and filter with arrow function to remove empty tokens
+        // So we end up with a flattened array (one element per token, 
+        // regardless of the structure indicated by the number of #)
+        tokenText = val['comment'].
+          split('#').
+          map(function(itm){return itm.trim();}).
+          filter(item => item); 
+
+        // And to determine the level of each token from the comment, we count 
+        // the number of #s that precede it
+        tokenLevel = val['comment'].match(/(#)\1*/g) || [];//match sequences of #
+        tokenLevel = tokenLevel.map(function(itm){return itm.length;});
+
+        document.getElementById("tab_c").innerHTML += '<br/><br/>Tokenizing ... [levels: ' + tokenLevel + ']';
+
         var parentId = ['#t'];
         let i = 0;
-        for (token_i of valTokens) {
+        for (token_i of tokenText) {
 
+          // We want to generate a hierarchical structure across annotations. 
+          // That means we want to match tokens to their respective parents, 
+          // either in: 
+          // 1. the skeleton, 
+          // 2. within the annotation (e.g. #dad ##son1) 
+          // 3. across annotations (e.g. if annotation A has #dad ##son1 and 
+          //    annotation B has #dad ##son2, the vis should show son1 and son2 
+          //    both under dad, not each of them in a different branch)
+          // Thus, we want to check if every token matches existing nodes
+          // in the visData, either by ID (e.g. to match those in the skeleton), 
+          // or by label (e.g. to be able to match across annotations)
+          // TODO: check the levels to assign color. Currently there is 
+          //       inconsistent behaviour if you match either by id or label
+          //       using a different level than the level it aready has
+          //       e.g. #hey ##t
+          //            #sub ##subsub  ;  #subsub ##wow
           var nodeIds = visData.nodes.map(function(itm){return itm.id;});
-          var nodeLabels = visData.nodes.map(function(itm){return itm.label.trim().replace(/\n/g, ' ');});
-          var nodeIdIndex = nodeIds.indexOf('#' + token_i); //does not work cause indexo internally use strict comparison ===
+          var nodeLabels = visData.nodes.map(function(itm){
+            return itm.label.trim().replace(/\n/g, ' ');
+          });
+          var nodeLevels = visData.nodes.map(function(itm){
+            return itm.level;
+          });
+          // watchout, it may not work because indexof internally uses strict 
+          // comparison ===
+          var nodeIdIndex = nodeIds.indexOf('#' + token_i); 
           var nodeLabelIndex = nodeLabels.indexOf(token_i);
-          //var toy = '#' + token_i;
-          //var nodeIdIndex = nodeIds.findIndex(function(itm){return itm == toy;}); // 3
-          //var nodeLabelIndex = nodeLabels.findIndex(itm => itm == 'hard to identify relevant alternatives');
+          var nodeIndex = (nodeIdIndex != -1) ? nodeIdIndex : nodeLabelIndex
+          // We will need the id of the existing token, matching the current one
+          // If it was a match by id, easy, that is the id
+          // But if it matched by label, we need to get the id of that label
+          existingNodeId = nodeIds[nodeIndex];
+          existingNodeLevel = nodeLevels[nodeIndex];
 
+          var alreadyExists = nodeIdIndex != -1 || nodeLabelIndex != -1;
+          var isLeaf = tokenText.indexOf(token_i) === tokenText.length - 1;
+          var hasDirectChild = tokenLevel[i] < tokenLevel[i + 1];
+          var hasNoChildNoSibling = tokenLevel[i] > tokenLevel[i + 1];
+          var hasSibling = tokenLevel[i] == tokenLevel[i + 1];
+          // This defines children as those that have exactly one more level
+          
           document.getElementById("tab_c").innerHTML += '<br/><br/><span style="padding-left: 40px; display:block">** Token_i: [' + token_i + ']</span>';
-          document.getElementById("tab_c").innerHTML += '<span style="padding-left: 40px; display:block">nodeIdIndex: [' + nodeIdIndex + '] e.g. has parent by id?</span>';
-          document.getElementById("tab_c").innerHTML += '<span style="padding-left: 40px; display:block">nodeLabelIndex: [' + nodeLabelIndex + '] e.g. has parent by label?</span>';
+          document.getElementById("tab_c").innerHTML += '<span style="padding-left: 40px; display:block">   nodeIdIndex: [' + nodeIdIndex + '] e.g. has parent by id?</span>';
+          document.getElementById("tab_c").innerHTML += '<span style="padding-left: 40px; display:block">   nodeLabelIndex: [' + nodeLabelIndex + '] e.g. has parent by label?</span>';
+          document.getElementById("tab_c").innerHTML += '<span style="padding-left: 40px; display:block">   nodeIndex: [' + nodeIndex + ']</span>';
+          document.getElementById("tab_c").innerHTML += '<span style="padding-left: 40px; display:block">   existingNodeId: [' + existingNodeId + ']</span>';
+          document.getElementById("tab_c").innerHTML += '<span style="padding-left: 40px; display:block">   existingNodeLevel: [' + existingNodeLevel + ']</span>';
+          document.getElementById("tab_c").innerHTML += '<span style="padding-left: 40px; display:block">   parentId: [' + parentId + ']</span>';
 
-          if (nodeIdIndex != -1) { // if exists id, push to parentId, always level 3 'cause it matches only existing level2 nodes
-            parentId.push(('#' + token_i)); 
+          if (alreadyExists) { 
+
+            if (hasDirectChild) { 
+              parentId.push(existingNodeId);
+            } else if (hasNoChildNoSibling) {
+              parentId.pop();
+            }
             document.getElementById("tab_c").innerHTML += '<br/><br/><span style="padding-left: 80px; display:block">*** Parent by id exists => push new parent id  [' + token_i + ' - ' + parentId + ']</span>';
-            if (valTokens.indexOf(token_i) === valTokens.length - 1 || valLevels[i] != valLevels[i + 1] - 1) { // If the token has no children, then simply add it
 
-              // We do not want too long labels, so truncate them and word-wrap them as necessary
-              labelText = wordWrap(val['highlightText'], 30, '\n', 80);
-              titleText = wordWrap(val['highlightText'], 50, '<br/>');
-              // Finally add the node and edge
+            // If current token has no children, add a child to the existing one
+            // (e.g. the comment is just #m, then matches the methods node in 
+            //  the skeleton but has no further comments -no children-.
+            //  this would be useful to quickly add the highlight under the 
+            //  methods node)
+            if (isLeaf || hasNoChildNoSibling || hasSibling) { 
+              nodeTxt = wordWrap(val['highlightText'], 30, '\n', 80);
+              tooltip = wordWrap(val['highlightText'], 50, '<br/>');
               newId = Math.random();
-              visData.nodes.add([{id: newId, label: labelText, title: titleText, level: 3}]);
-              visData.edges.add([{from: '#' + token_i, to: newId}]);                
-              document.getElementById("tab_c").innerHTML += '<br/><br/><span style="padding-left: 80px; display:block">*** A: I am leaf so add it [id:' + newId + ' | label:' + labelText + ' | level:3' + ' | parent:' + '#' + token_i + ']</span>';
+              // level 3 'cause it should match most of the time existing 
+              // level2 nodes, that is, those in the skeleton and under the #t
+              visData.nodes.add([{
+                id: newId, label: nodeTxt, title: tooltip, 
+                level: existingNodeLevel + 1
+              }]);
+              visData.edges.add([{from: existingNodeId, to: newId}]); 
+
+              document.getElementById("tab_c").innerHTML += '<br/><br/><span style="padding-left: 80px; display:block">*** A: I am leaf so add it [id:' + newId + ' | label:' + nodeTxt + ' | level:3' + ' | parent:' + '#' + existingNodeId + ']</span>';
             }
-
-          } else if (nodeLabelIndex != -1) { // if exists label, push to parentId (matching id for the label)
-            parentId.push(nodeIds[nodeLabelIndex]);
-            document.getElementById("tab_c").innerHTML += '<br/><br/><span style="padding-left: 80px; display:block">*** Parent by label exists => push new parent id  [' + token_i + ' - ' + parentId + ']</span>';
-            if (valTokens.indexOf(token_i) === valTokens.length - 1 || valLevels[i] != valLevels[i + 1] - 1) {
-
-              // We do not want too long labels, so truncate them and word-wrap them as necessary
-              labelText = wordWrap(val['highlightText'], 30, '\n', 80);
-              titleText = wordWrap(val['highlightText'], 50, '<br/>');
-              // Why was I doing this?
-              //visData.nodes.update([{id: nodeIds[nodeLabelIndex], title: titleText}]); //TODO: append to title, instead of replace
-              // Finally add the node and edge
-              newId = Math.random();
-              visData.nodes.add([{id: newId, label: labelText, title: titleText, level: valLevels[i] + 2}]);
-              visData.edges.add([{from: nodeIds[nodeLabelIndex], to: newId}]);                
-              document.getElementById("tab_c").innerHTML += '<br/><br/><span style="padding-left: 80px; display:block">**** B: Is leaf? => Add new node  [id:' + newId + ' | label:' + labelText + ' | level:' + valLevels[i] + 2 + ' | parent:' + nodeIds[nodeLabelIndex] + ']</span>';
-            }
-
-          } else if (valLevels[i] === 1 && valLevels[i] != valLevels[i + 1] - 1) {
-
-            // We do not want too long labels, so truncate them and word-wrap them as necessary
-            labelText = wordWrap(token_i, 30, '\n');
-            titleText = wordWrap(val['highlightText'], 50, '<br/>');
-            // Finally add the node and edge
-            newId = Math.random();
-            visData.nodes.add([{id: newId, label: labelText, title: '', level: 2}]);
-            visData.edges.add([{from: parentId[valLevels[i] - 1], to: newId}]);                
-            parentId.push(newId);
-
-            // We do not want too long labels, so truncate them and word-wrap them as necessary
-            labelText = wordWrap(val['highlightText'], 30, '\n', 80);
-            titleText = wordWrap(val['highlightText'], 50, '<br/>');
-            // Finally add the node and edge
-            newIdChild = Math.random();
-            visData.nodes.add([{id: newIdChild, label: labelText, title: titleText, level: 3}]);
-            visData.edges.add([{from: newId, to: newIdChild}]);                
-            parentId.push(newIdChild);
-
-            document.getElementById("tab_c").innerHTML += '<br/><br/><span style="padding-left: 80px; display:block">*** C: To level 1 add => Add new node  [id:' + newId + ' | label:' + labelText + ' | level:' + valLevels[i] + 1 + ' | parent:2' + ']' + '</span>';
-              
           } else {
-            // We do not want too long labels, so truncate them and word-wrap them as necessary
-            labelText = wordWrap(token_i, 30, '\n');
-            titleText = wordWrap(val['highlightText'], 50, '<br/>');
-            // Finally add the node and edge
+            // If does not exists simply add it
+            nodeTxt = wordWrap(token_i, 30, '\n');
+            tooltip = wordWrap(val['highlightText'], 50, '<br/>');
             newId = Math.random();
-            visData.nodes.add([{id: newId, label: labelText, title: titleText, level: valLevels[i] + 1}]);
-            visData.edges.add([{from: parentId[valLevels[i] - 1], to: newId}]);                
-            parentId.push(newId);
+            // parent is the last one in the parentId
+            // Note that this effectively sets the corresponding parent 
+            // even if the level does not match. So the levels are used to 
+            // determine whether to add (push) or drop (pop) elements from the 
+            // parentsId array
+            dadId = parentId[parentId.length - 1]; 
+            visData.nodes.add([{
+              id: newId, label: nodeTxt, title: tooltip, 
+              level: tokenLevel[i] + 1
+            }]);
+            visData.edges.add([{from: dadId, to: newId}]);
+            
+            if (hasDirectChild) { 
+              parentId.push(newId);
+            } else if (hasNoChildNoSibling) {
+              parentId.pop();
+            }
 
-            document.getElementById("tab_c").innerHTML += '<br/><br/><span style="padding-left: 80px; display:block">*** D: Normal add? => Add new node  [id:' + newId + ' | label:' + labelText + ' | level:' + valLevels[i] + 1 + ' | parent:' + parentId[valLevels[i] - 1] + ']' + '</span>';
+            document.getElementById("tab_c").innerHTML += '<br/><br/><span style="padding-left: 80px; display:block">*** D: Normal add? => Add new node  [id:' + newId + ' | label:' + nodeTxt + ' | level:' + (tokenLevel[i] + 1) + ' | parent:' + dadId + ']' + '</span>';
           }
 
-          //document.getElementById("tab_d").innerHTML = document.getElementById("tab_d").innerHTML + '<br/><br/>' + (i + ': ' + token_i); // pure JS
-          //document.getElementById("tab_d").innerHTML = document.getElementById("tab_d").innerHTML + '<br/><br/>' + nodeIds + '<br/>' + toy + ': ' + nodeIdIndex; // pure JS
           i++;
         }
       }
     }
   }
 
+  // Set node colors according to the level
   visData.nodes.forEach(function(node_i){
     switch (node_i.level) {
       case 0:
@@ -263,16 +311,28 @@ function buildVisReport(refData, commentsData) {
         visData.nodes.update([{id: node_i.id, color:'#C2FABC'}]);
         break;
     }
-      
   });
 
-  
-  //    {id: 3, label: 'node\nthree', shape: 'diamond', color:'#FB7E81'},
-  //    {id: 5, label: 'node\nfive', shape: 'ellipse', color:'#6E6EFD'},
-  //    {id: 8, label: 'node\neight', shape: 'triangleDown', color:'#6E6EFD'}
+  document.getElementById("tab_d").innerHTML = JSON.stringify(visData.edges); // pure JS
 
+  // Remove level 1 empty nodes, before creating the network. So remove nodes 
+  // in the skeleton that after filling the data, have no children
+  var edgesFroms = visData.edges.map(function(itm){return itm.from;});
+  if(edgesFroms.indexOf('#b') === -1) visData.nodes.remove({id: '#b'});
+  if(edgesFroms.indexOf('#o') === -1) visData.nodes.remove({id: '#o'});
+  if(edgesFroms.indexOf('#m') === -1) visData.nodes.remove({id: '#m'});
+  if(edgesFroms.indexOf('#r') === -1) visData.nodes.remove({id: '#r'});
+  if(edgesFroms.indexOf('#c') === -1) visData.nodes.remove({id: '#c'});
+  if(edgesFroms.indexOf('#q') === -1) visData.nodes.remove({id: '#q'});
+  if(edgesFroms.indexOf('#h') === -1) visData.nodes.remove({id: '#h'});
+  if(edgesFroms.indexOf('#k') === -1) visData.nodes.remove({id: '#k'});
+  if(edgesFroms.indexOf('#crossref') === -1) visData.nodes.remove({id: '#crossref'});
+  if(edgesFroms.indexOf('#todo') === -1) visData.nodes.remove({id: '#todo'});
 
-  // create a network
+  return visData;
+}
+
+function getVisOptions() {
   var options = {
     autoResize: true,
     //width: (window.innerWidth - 125) + "px",
@@ -323,28 +383,12 @@ function buildVisReport(refData, commentsData) {
       }
     }/**/
   };
-  document.getElementById("tab_d").innerHTML = JSON.stringify(visData); // pure JS
-
-  // Remove level 1 empty nodes, before creating the network
-  var edgesFroms = visData.edges.map(function(itm){return itm.from;});
-  if(edgesFroms.indexOf('#b') === -1) visData.nodes.remove({id: '#b'});
-  if(edgesFroms.indexOf('#o') === -1) visData.nodes.remove({id: '#o'});
-  if(edgesFroms.indexOf('#m') === -1) visData.nodes.remove({id: '#m'});
-  if(edgesFroms.indexOf('#r') === -1) visData.nodes.remove({id: '#r'});
-  if(edgesFroms.indexOf('#c') === -1) visData.nodes.remove({id: '#c'});
-  if(edgesFroms.indexOf('#q') === -1) visData.nodes.remove({id: '#q'});
-  if(edgesFroms.indexOf('#h') === -1) visData.nodes.remove({id: '#h'});
-  if(edgesFroms.indexOf('#k') === -1) visData.nodes.remove({id: '#k'});
-  if(edgesFroms.indexOf('#crossref') === -1) visData.nodes.remove({id: '#crossref'});
-  if(edgesFroms.indexOf('#todo') === -1) visData.nodes.remove({id: '#todo'});
-
-  var container = document.getElementById('tab_a');
-  var network = new vis.Network(container, visData, options);
+  return options;
 }
 
 function getMindMapSkeleton() {
 
-  // create an array with nodes
+  // create an array with predefined nodes
   var nodes = new vis.DataSet([
     {id: '#t', label: 'Title \n subtitle', level: 1, color: '#7BE141'},
     {id: '#b', label: 'Background', level: 2, color: '#FFA807'},
@@ -355,11 +399,11 @@ function getMindMapSkeleton() {
     {id: '#q', label: 'Questions / Comments', level: 2, color: '#FFA807'},
     {id: '#h', label: 'Highlights', level: 2, color: '#FFA807'},
     {id: '#k', label: 'Key Messages', level: 2, color: '#FFA807'},
-    {id: '#crossref', label: 'crossref', level: 2, color: '#FFA807'},
+    {id: '#crossref', label: 'Cross-References', level: 2, color: '#FFA807'},
     {id: '#todo', label: 'To Do', level: 2, color: '#FFA807'}
   ]);
 
-  // create an array with edges
+  // create an array with predefined edges
   var edges = new vis.DataSet([
     {from: '#t', to: '#b'},
     {from: '#t', to: '#o'},
@@ -391,3 +435,30 @@ function wordWrap(rawText, wrapWidth = 50, wrapSeparator = '\n', trunc = -1) {
   return wrapped;
 }
 
+/*
+
+#m
+should add 
+
+
+#r                              
+##10 articles                   
+###7 infectious diseases       
+###3 non-infectious    
+##what did we do with that? 
+###nothing 
+###but maybe something 
+####something was 1 
+####something was 2
+
+
+
+
+
+#main ##sub1 ###subsub1
+#####AAAAA
+#z1 ##x1 ###b1
+#a1 ##b1 ###c1
+#A ##A.1 ##A.2 ###A.2.1 ###A.2.2 ##A.3
+
+*/
