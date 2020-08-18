@@ -1,13 +1,16 @@
 {
-  "name": "Getting Started Example",
+  "name": "Annotations Report for Sciwheel",
   "version": "0.1",
-  "description": "Build an Extension!",
+  "description": "Generates a visualization for the annotations from an opened reference in Sciwheel",
   "permissions": ["storage", "webNavigation", "declarativeContent", "tabs", "activeTab"],
   "background": {
     "scripts": ["background.js"],
     "persistent": false
   },
-  "options_page": "options.html",
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": false
+  },
   "page_action": {
     "default_icon": {
       "16": "images/get_started16.png",

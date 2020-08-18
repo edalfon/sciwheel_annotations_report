@@ -73,21 +73,16 @@ chrome.tabs.onActivated.addListener(function(activeInfo) {
 chrome.pageAction.onClicked.addListener(function(activeTab) {
 
   var sciwheelRefId = getSciwheelRefId(activeTab.url)
-
   chrome.storage.sync.set({'sciwheelRefId': sciwheelRefId}, function() {
+    // TODO: pass the id using local storage or other means (GET params?)
+    //       currently using storage.sync because that's the way we store the 
+    //       API token (which is good, because the user sets the token once
+    //       and forget about it -even in other computer, thx to the sync-)
     // Notify that we saved.
-    //message('Settings saved');
+    // message('Settings saved');
   });
 
-  var sciwheelAuthToken = '560ED7B3E32586E1FAC3672088EA049E';
-  chrome.storage.sync.set({'sciwheelAuthToken': sciwheelAuthToken}, function() {
-    // Notify that we saved.
-    //message('Settings saved');
-  });
-
-  // get token
-  
-  var newURL = "annotations_report.html" + "?sciwheelRefId=" + sciwheelRefId;
+  var newURL = "annotations_report.html";
   chrome.tabs.create({ url: newURL });
 
 });
