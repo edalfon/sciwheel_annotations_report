@@ -11,6 +11,9 @@ document.addEventListener('DOMContentLoaded', function () {
   //         by the get async has not responded yet) and
   //       - module pattern to avoid the global vars
   chrome.storage.sync.get(['sciwheelAuthToken', 'sciwheelRefId'], function(result) {
+    if(chrome.runtime.lastError) {
+      console.warn("Error: " + chrome.runtime.lastError.message);
+    }
     var sciwheelRefId = result.sciwheelRefId;
     var sciwheelAuthToken = result.sciwheelAuthToken;
     // once refId and AuthToken are ready
@@ -39,14 +42,32 @@ async function getRefData(sciwheelRefId, sciwheelAuthToken) {
       "Authorization": "Bearer " + sciwheelAuthToken,
       "Content-type": "application/json;charset=UTF-8"
     }
-  }).catch(function (error) {
+  }).then(handleErrors).catch(function (error) {
     // TODO: real error handling
     document.getElementById("tab_d").innerHTML = "ERROR !!!"; // pure JS
   });
 
+  document.getElementById("tab_c").innerHTML = JSON.stringify(refResponse.status);
   return refResponse.json();
 }
 
+function handleErrors(response) {
+  switch (response.status) {
+    case 401:
+      visData.nodes.update([{id: node_i.id, color:'#7BE141'}]);
+      break;
+    case 403:
+      visData.nodes.update([{id: node_i.id, color:'#7BE141'}]);
+      break;
+    case 500:
+      visData.nodes.update([{id: node_i.id, color:'#FFA807'}]);
+      break;
+  }
+  if (!response.ok) {
+      throw Error(response.statusText);
+  }
+  return response;
+}
 
 // using async/await for the fetch calls, cleaner code (avoids callbac-hell)
 async function getNotesData(sciwheelRefId, sciwheelAuthToken) {
@@ -64,7 +85,6 @@ async function getNotesData(sciwheelRefId, sciwheelAuthToken) {
     // TODO: real error handling
     document.getElementById("tab_d").innerHTML = "ERROR !!!"; // pure JS
   });
-
   return notesResponse.json();
 }
 
