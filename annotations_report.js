@@ -19,11 +19,26 @@ document.addEventListener('DOMContentLoaded', function () {
     if (!sciwheelRefId) return errorRefId();
     if (chrome.runtime.lastError) return errorGeneric();
 
-    // once refId and AuthToken are ready
-    buildAnnotationReports(sciwheelRefId, sciwheelAuthToken);
-  });
+    // once refId and AuthToken are ready, we can try and get the data
+    // TODO: consider using Promise.parallel, maybe a bit faster and fail earlier
+    refJsonData = await getRefData(sciwheelRefId, sciwheelAuthToken);
+    notesJsonData = await getNotesData(sciwheelRefId, sciwheelAuthToken);
+    if (!refJsonData || !notesJsonData) return; // terminate if error above
 
+    // With the data ready, include reports
+    includeVisReport(refJsonData, notesJsonData);
+    // We can add here other output formats
+  });
 });
+
+// https://www.tjvantoll.com/2015/09/13/fetch-and-errors/
+// https://stackoverflow.com/questions/54163952/async-await-in-fetch-how-to-handle-errors
+// https://itnext.io/error-handling-with-async-await-in-js-26c3f20bc06a
+// http://thecodebarbarian.com/async-await-error-handling-in-javascript
+// https://stackoverflow.com/questions/58815415/how-to-handle-multiple-awaits-in-async-function
+// https://stackoverflow.com/questions/46889290/waiting-for-more-than-one-concurrent-await-operation
+// https://javascript.info/promise-error-handling
+
 
 function errorToken() {
   notifyError(
@@ -48,26 +63,6 @@ function errorGeneric(errMsg) {
 
 function notifyError(errMsg) {
   document.getElementById("tab_a").innerHTML = errMsg;
-}
-
-// https://www.tjvantoll.com/2015/09/13/fetch-and-errors/
-// https://stackoverflow.com/questions/54163952/async-await-in-fetch-how-to-handle-errors
-// https://itnext.io/error-handling-with-async-await-in-js-26c3f20bc06a
-// http://thecodebarbarian.com/async-await-error-handling-in-javascript
-// https://stackoverflow.com/questions/58815415/how-to-handle-multiple-awaits-in-async-function
-// https://stackoverflow.com/questions/46889290/waiting-for-more-than-one-concurrent-await-operation
-// https://javascript.info/promise-error-handling
-
-async function buildAnnotationReports(sciwheelRefId, sciwheelAuthToken) {
-
-  // TODO: consider using Promise.parallel, maybe a bit faster and fail earlier
-  refJsonData = await getRefData(sciwheelRefId, sciwheelAuthToken);
-  notesJsonData = await getNotesData(sciwheelRefId, sciwheelAuthToken);
-  if (!refJsonData || !notesJsonData) return; // terminate if error above
-
-  // Build reports
-  includeVisReport(refJsonData, notesJsonData);
-  // We can add here other output formats
 }
 
 async function getRefData(sciwheelRefId, sciwheelAuthToken) {
