@@ -28,6 +28,9 @@ function delete_options() {
 function restore_options() {
     chrome.storage.sync.get(['sciwheelAuthToken'], function(result) {
         var sciwheelAuthToken = result.sciwheelAuthToken;
+        // Test for non-falsy val. If not token had been set, it'd be undefined
+        // Other approach would be asking for the key with default value
+        // https://stackoverflow.com/questions/29399293/checking-whether-data-already-exists-in-chrome-storage-sync
         if (sciwheelAuthToken) {
             document.getElementById('sciwheelAuthToken').value = sciwheelAuthToken;
             document.getElementById('delete_btn').style.display = "block";

@@ -21,8 +21,8 @@ function getSciwheelRefId(tabUrl) {
   // Matches either of those formats, or returns null
   refId = refIdDetailView ?? refIdPdfView ?? refIdUnsortedView; // Nullish coalescing operator
   refId = refId ? refId[2] : refId; // id are the numbers in the second group
-  console.log(tabUrl)
-  console.log(refId)
+  //console.log(tabUrl)
+  //console.log(refId)
   return refId;
 }
 

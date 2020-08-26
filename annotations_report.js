@@ -1,92 +1,136 @@
-// Add event listeners once the DOM has fully loaded by listening for the
-// `DOMContentLoaded` event on the document, and adding your listeners to
-// specific elements when it triggers.
+// fill the html skeleton with hthe annotations report once DOM has fully loaded 
+// `DOMContentLoaded` event on the document
 document.addEventListener('DOMContentLoaded', function () {
   // Before starting getting data from sciwheel we need to know which reference 
   // to query and the authorization token
-  // TODO: check how to do it better considering:
-  //       - async behaviour (can happen that we try to get the value, 
-  //         and it is not already set and/or that we get the value and 
-  //         continue rendering the page, which assumes we got the value, 
-  //         by the get async has not responded yet) and
-  //       - module pattern to avoid the global vars
+  // TODO: consider improvements such as:
+  // - Pass refId differently (get request params, session, local storage, etc.)
+  //   since we do not really need to use storage.sync for that (yes for token)
+  //   currently here just for convenience to keep the code short 
+  // - improvements to async behaviour and callback handling
+  // - module pattern to avoid global vars
+
   chrome.storage.sync.get(['sciwheelAuthToken', 'sciwheelRefId'], function(result) {
-    if(chrome.runtime.lastError) {
-      console.warn("Error: " + chrome.runtime.lastError.message);
-    }
     var sciwheelRefId = result.sciwheelRefId;
     var sciwheelAuthToken = result.sciwheelAuthToken;
+
+    // Error handling, notifying user and return to terminate here
+    if (!sciwheelAuthToken) return errorToken();
+    if (!sciwheelRefId) return errorRefId();
+    if (chrome.runtime.lastError) return errorGeneric();
+
     // once refId and AuthToken are ready
     buildAnnotationReports(sciwheelRefId, sciwheelAuthToken);
   });
+
 });
+
+function errorToken() {
+  notifyError(
+    `It seems you have not provided the Sciwheel authorization token yet.
+    Please go to the extension options and follow the instructions to obtain 
+    and provide the authorization token to enable this extension to access 
+    the data from your Sciwheel account.`
+  );
+}
+
+function errorRefId() {
+  notifyError(
+    `Something went wrong getting the reference id! 
+    Please try refreshing this page`
+  );
+}
+
+function errorGeneric(errMsg) {
+  notifyError(`Something went wrong! Please try refreshing this page`);
+  if (errMsg) notifyError(errMsg);
+}
+
+function notifyError(errMsg) {
+  document.getElementById("tab_a").innerHTML = errMsg;
+}
+
+// https://www.tjvantoll.com/2015/09/13/fetch-and-errors/
+// https://stackoverflow.com/questions/54163952/async-await-in-fetch-how-to-handle-errors
+// https://itnext.io/error-handling-with-async-await-in-js-26c3f20bc06a
+// http://thecodebarbarian.com/async-await-error-handling-in-javascript
+// https://stackoverflow.com/questions/58815415/how-to-handle-multiple-awaits-in-async-function
+// https://stackoverflow.com/questions/46889290/waiting-for-more-than-one-concurrent-await-operation
+// https://javascript.info/promise-error-handling
 
 async function buildAnnotationReports(sciwheelRefId, sciwheelAuthToken) {
 
+  // TODO: consider using Promise.parallel, maybe a bit faster and fail earlier
   refJsonData = await getRefData(sciwheelRefId, sciwheelAuthToken);
   notesJsonData = await getNotesData(sciwheelRefId, sciwheelAuthToken);
+  if (!refJsonData || !notesJsonData) return; // terminate if error above
+
   // Build reports
   includeVisReport(refJsonData, notesJsonData);
   // We can add here other output formats
 }
 
-// using async/await for the fetch calls, cleaner code (avoids callbac-hell)
 async function getRefData(sciwheelRefId, sciwheelAuthToken) {
+  var urlApiReq =  "/references/" + sciwheelRefId;
+  return sciwheelApiCall(urlApiReq, sciwheelAuthToken);
+}
 
+async function getNotesData(sciwheelRefId, sciwheelAuthToken) {
+  var urlApiReq =  "/references/" + sciwheelRefId + "/notes";
+  return sciwheelApiCall(urlApiReq, sciwheelAuthToken);
+}
+
+// using async/await for the fetch calls, cleaner code (avoids callbac-hell)
+async function sciwheelApiCall(urlApiReq, sciwheelAuthToken) {
   var baseUrl = "https://sciwheel.com/extapi/work";
-
-  var refsUrl = baseUrl + "/references/" + sciwheelRefId;
-  let refResponse = await fetch(refsUrl, {
+  var apiCallUrl = baseUrl + "/" + urlApiReq;
+  return fetch(apiCallUrl, {
     method: 'get',
     headers: {
       "Authorization": "Bearer " + sciwheelAuthToken,
       "Content-type": "application/json;charset=UTF-8"
     }
-  }).then(handleErrors).catch(function (error) {
-    // TODO: real error handling
-    document.getElementById("tab_d").innerHTML = "ERROR !!!"; // pure JS
-  });
-
-  document.getElementById("tab_c").innerHTML = JSON.stringify(refResponse.status);
-  return refResponse.json();
+  })
+    .then(handleApiErrors) // fetch doesn't catch response codes like 401, 500
+    .then(response => response.ok ? response.json(): null)
+    .catch(err => errorGeneric(err.message));
 }
 
-function handleErrors(response) {
+function handleApiErrors(response) {
   switch (response.status) {
-    case 401:
-      visData.nodes.update([{id: node_i.id, color:'#7BE141'}]);
+    case 200: // Successful request
       break;
-    case 403:
-      visData.nodes.update([{id: node_i.id, color:'#7BE141'}]);
+    case 401: // Unauthorized: User authorization error (e.g., invalid authorization token), or client has broken the rate limit
+      notifyError(`
+        We got User authorization error from Sciwheel. Either you have provided
+        an invalid authorization token or you have used too much and too quickly
+        this extension or other tools that call the Sciwheel API with your 
+        token. The later seems unlikely. So go ahead and check the 
+        authorization token is up to date.
+      `);
       break;
-    case 500:
-      visData.nodes.update([{id: node_i.id, color:'#FFA807'}]);
+    case 403: // Insufficient privileges for the request
+      notifyError(`
+        We got Insufficient privileges for the request error from Sciwheel.
+        Check your authorization token and try again. If the error persists
+        please contact us.
+      `);
       break;
-  }
-  if (!response.ok) {
-      throw Error(response.statusText);
+    case 500: // Server-related issue. Please contact us if the error persists
+      notifyError(`
+        We got a Server-related issue from Sciwheel.
+        Please try again. If the error persists please contact us.
+      `);
+      break;
+    default: // TODO: if (!response.ok)
+      notifyError(`
+      We got an undefined error from Sciwheel.
+      Please try again. If the error persists please contact us.
+    `);
   }
   return response;
 }
 
-// using async/await for the fetch calls, cleaner code (avoids callbac-hell)
-async function getNotesData(sciwheelRefId, sciwheelAuthToken) {
-
-  var baseUrl = "https://sciwheel.com/extapi/work";
-
-  var notesUrl = baseUrl + "/references/" + sciwheelRefId + "/notes";
-  let notesResponse = await fetch(notesUrl, {
-    method: 'get',
-    headers: {
-      "Authorization": "Bearer " + sciwheelAuthToken,
-      "Content-type": "application/json;charset=UTF-8"
-    }
-  }).catch(function (error) {
-    // TODO: real error handling
-    document.getElementById("tab_d").innerHTML = "ERROR !!!"; // pure JS
-  });
-  return notesResponse.json();
-}
 
 function includeVisReport(refData, notesData) {
 
