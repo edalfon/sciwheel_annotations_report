@@ -67,7 +67,13 @@ async function buildAnnotationReports(sciwheelRefId, sciwheelAuthToken) {
 
   // Build reports
   includeVisReport(refJsonData, notesJsonData);
+  includeJsonTreeViewer(refJsonData, notesJsonData);
   // We can add here other output formats
+}
+
+function includeJsonTreeViewer(refData, notesData) {
+  var container = document.getElementById('tab_b');
+  var tree = jsonTree.create(notesData, container);
 }
 
 async function getRefData(sciwheelRefId, sciwheelAuthToken) {
@@ -157,7 +163,6 @@ function includeVisReport(refData, notesData) {
 
 // This is a monster fn that could be better implemented / modularized
 function buildVisData(refData, notesData) {
-  document.getElementById("tab_b").innerHTML = JSON.stringify(notesData); // just for debugging and trying other tabs
 
   // We start with the mind map skeleton and we will add comments as nodes
   // skeleton already have nodes for title, objectives, methods, etc. 
@@ -182,8 +187,6 @@ function buildVisData(refData, notesData) {
 
   for (var val of notesData) {
 
-    document.getElementById("tab_c").innerHTML += '<br/><br/>* Main annotation. Comment: [' + val['comment'] + '] ' + 'Highlight: [' + val['highlightText'] + ']';
-
     // If there is no comment (either empty string, null or undefined) put it 
     // in highlights using the highlightText as node text
     if((val['comment'] === null && typeof val['comment'] === "object") ||
@@ -199,8 +202,7 @@ function buildVisData(refData, notesData) {
         id: newId, label: nodeTxt, title: tooltip, level: 3
       }]);
       visData.edges.add([{from: '#h', to: newId}]);
-
-      document.getElementById("tab_c").innerHTML += '<br/><br/><span style="padding-left: 40px; display:block>** No comment => add to #h [id:' + newId + ' | label:' + nodeTxt + ' | level:3' + ' | parent:#h' + ']</span>';
+      
     } else {
 
       if(!val['comment'].includes("#")) { // this means there are no delimiters,
@@ -214,7 +216,6 @@ function buildVisData(refData, notesData) {
         }]);
         visData.edges.add([{from: '#h', to: newId}]);
 
-        document.getElementById("tab_c").innerHTML += '<br/><br/><span style="padding-left: 40px; display:block>** No delimiter, just comment => add to #h [id:' + newId + ' | label:' + nodeTxt + ' | level:3' + ' | parent:#h' + ']</span>';
       } else {
 
         // Then let's tokenize the comment that has structure
@@ -231,8 +232,6 @@ function buildVisData(refData, notesData) {
         // the number of #s that precede it
         tokenLevel = val['comment'].match(/(#)\1*/g) || [];//match sequences of #
         tokenLevel = tokenLevel.map(function(itm){return itm.length;});
-
-        document.getElementById("tab_c").innerHTML += '<br/><br/>Tokenizing ... [levels: ' + tokenLevel + ']';
 
         var parentId = ['#t'];
         let i = 0;
@@ -279,14 +278,6 @@ function buildVisData(refData, notesData) {
           var hasSibling = tokenLevel[i] == tokenLevel[i + 1];
           // This defines children as those that have exactly one more level
           
-          document.getElementById("tab_c").innerHTML += '<br/><br/><span style="padding-left: 40px; display:block">** Token_i: [' + token_i + ']</span>';
-          document.getElementById("tab_c").innerHTML += '<span style="padding-left: 40px; display:block">   nodeIdIndex: [' + nodeIdIndex + '] e.g. has parent by id?</span>';
-          document.getElementById("tab_c").innerHTML += '<span style="padding-left: 40px; display:block">   nodeLabelIndex: [' + nodeLabelIndex + '] e.g. has parent by label?</span>';
-          document.getElementById("tab_c").innerHTML += '<span style="padding-left: 40px; display:block">   nodeIndex: [' + nodeIndex + ']</span>';
-          document.getElementById("tab_c").innerHTML += '<span style="padding-left: 40px; display:block">   existingNodeId: [' + existingNodeId + ']</span>';
-          document.getElementById("tab_c").innerHTML += '<span style="padding-left: 40px; display:block">   existingNodeLevel: [' + existingNodeLevel + ']</span>';
-          document.getElementById("tab_c").innerHTML += '<span style="padding-left: 40px; display:block">   parentId: [' + parentId + ']</span>';
-
           if (alreadyExists) { 
 
             if (hasDirectChild) { 
@@ -294,7 +285,6 @@ function buildVisData(refData, notesData) {
             } else if (hasNoChildNoSibling) {
               parentId.pop();
             }
-            document.getElementById("tab_c").innerHTML += '<br/><br/><span style="padding-left: 80px; display:block">*** Parent by id exists => push new parent id  [' + token_i + ' - ' + parentId + ']</span>';
 
             // If current token has no children, add a child to the existing one
             // (e.g. the comment is just #m, then matches the methods node in 
@@ -312,8 +302,6 @@ function buildVisData(refData, notesData) {
                 level: existingNodeLevel + 1
               }]);
               visData.edges.add([{from: existingNodeId, to: newId}]); 
-
-              document.getElementById("tab_c").innerHTML += '<br/><br/><span style="padding-left: 80px; display:block">*** A: I am leaf so add it [id:' + newId + ' | label:' + nodeTxt + ' | level:3' + ' | parent:' + '#' + existingNodeId + ']</span>';
             }
           } else {
             // If does not exists simply add it
@@ -337,8 +325,6 @@ function buildVisData(refData, notesData) {
             } else if (hasNoChildNoSibling) {
               parentId.pop();
             }
-
-            document.getElementById("tab_c").innerHTML += '<br/><br/><span style="padding-left: 80px; display:block">*** D: Normal add? => Add new node  [id:' + newId + ' | label:' + nodeTxt + ' | level:' + (tokenLevel[i] + 1) + ' | parent:' + dadId + ']' + '</span>';
           }
 
           i++;
@@ -376,8 +362,6 @@ function buildVisData(refData, notesData) {
         break;
     }
   });
-
-  document.getElementById("tab_d").innerHTML = JSON.stringify(visData.edges); // pure JS
 
   // Remove level 1 empty nodes, before creating the network. So remove nodes 
   // in the skeleton that after filling the data, have no children
@@ -498,34 +482,6 @@ function wordWrap(rawText, wrapWidth = 50, wrapSeparator = '\n', trunc = -1) {
   wrapped = wrapped.replace(wrapRegexp, '$1' + wrapSeparator);
   return wrapped;
 }
-
-/*
-
-#m
-should add 
-
-
-#r                              
-##10 articles                   
-###7 infectious diseases       
-###3 non-infectious    
-##what did we do with that? 
-###nothing 
-###but maybe something 
-####something was 1 
-####something was 2
-
-
-
-
-
-#main ##sub1 ###subsub1
-#####AAAAA
-#z1 ##x1 ###b1
-#a1 ##b1 ###c1
-#A ##A.1 ##A.2 ###A.2.1 ###A.2.2 ##A.3
-
-*/
 
 // https://visjs.github.io/vis-network/docs/network/
 // https://visjs.github.io/vis-network/examples/
