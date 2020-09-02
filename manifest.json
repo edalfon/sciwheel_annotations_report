@@ -2,7 +2,11 @@
   "name": "Annotations Report for Sciwheel",
   "version": "0.1",
   "description": "Generates a visualization for the annotations from an opened reference in Sciwheel",
-  "permissions": ["storage", "webNavigation", "declarativeContent", "tabs", "activeTab"],
+  "permissions": [
+    "storage", // To store the authorization token
+    "webNavigation", // To listen to navigation events
+    "tabs" // we need the tab url
+  ],
   "background": {
     "scripts": ["background.js"],
     "persistent": false
