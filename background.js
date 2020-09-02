@@ -29,9 +29,12 @@ function getSciwheelRefId(tabUrl) {
 function onWebNav(details) {
 
   sciwheelRefId = getSciwheelRefId(details.url)
+  console.log(sciwheelRefId);
   if (sciwheelRefId) { 
+    console.log("SHOW");
     chrome.pageAction.show(details.tabId);
   } else {
+    console.log("HIDE");
     chrome.pageAction.hide(details.tabId);
   }
 
